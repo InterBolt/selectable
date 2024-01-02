@@ -1,0 +1,52 @@
+{
+  "name": "demo",
+  "description": "Narrow Ctx demo",
+  "author": "Colin Campbell",
+  "scripts": {
+    "start": "webpack serve --mode=development",
+    "build": "cross-env webpack"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@interbolt/narrow-ctx": "0.1.0-alpha.0",
+    "react": "^18.3.0-canary-c5b937576-20231219",
+    "react-dom": "^18.3.0-canary-c5b937576-20231219"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.20.7",
+    "@babel/core": "^7.20.12",
+    "@babel/preset-env": "^7.20.2",
+    "@babel/preset-react": "^7.18.6",
+    "babel-loader": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "eslint": "^8.33.0",
+    "eslint-config-airbnb": "^19.0.4",
+    "eslint-plugin-import": "^2.27.5",
+    "eslint-plugin-jsx-a11y": "^6.7.1",
+    "eslint-plugin-react": "^7.32.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "html-webpack-plugin": "^5.5.0",
+    "http-server": "^14.1.1",
+    "npm-run-all": "^4.1.5",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.3.3",
+    "webpack": "^5.75.0",
+    "webpack-cli": "^5.0.1",
+    "webpack-dev-server": "^4.11.1"
+  },
+  "babel": {
+    "env": {
+      "development": {
+        "presets": [
+          [
+            "@babel/preset-env",
+            {
+              "targets": "> 0.2%, not dead"
+            }
+          ],
+          "@babel/preset-react"
+        ]
+      }
+    }
+  }
+}

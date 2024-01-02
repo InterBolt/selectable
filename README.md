@@ -175,6 +175,18 @@ const useModeColorSelector = useColorsSelector(
 );
 ```
 
+# Demo
+
+Since its a bit tricky to get working until React 18.3.0 comes out, I included a demo in the `demo/` folder. To get it running do:
+
+```shell
+cd demo
+npm ci
+npm run start
+```
+
+Then navigate to `http://localhost:8080/` to see it in action. I suggest using the demo as a playground to familiarize yourself with the API.
+
 # Motivation
 
 This was built in response to [the twitter discussion](https://nitter.net/TkDodo/status/1741193371283026422) started by [@DkDodo](https://twitter.com/TkDodo)(Dominik). In his tweet, Dominik shared a screenshot showing how the new `React.use` api will automatically memoize a selected portion of a context value likeso:
