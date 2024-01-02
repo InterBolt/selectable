@@ -9,6 +9,14 @@ Zero-dependency drop-in replacement for React's `createContext` that exposes a c
 - [ ] rewrite in TypeScript after React@18.3.0 is officially released
 - [ ] minimal test suite to verify render and concurrency assumptions
 
+# Table of Contents
+
+- [Usage](#usage)
+- [API](#api)
+- [Demo](#demo)
+- [Motivation](#motivation)
+- [Blog](#blog)
+
 # Usage
 
 ```tsx
