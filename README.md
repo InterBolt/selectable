@@ -192,7 +192,10 @@ const useDashboardFeaturesToSuggest = useUserSelector.narrow(
   (featureFlags, dashboardFeatures, user) => {
     const { activeFeatures } = featureFlags;
     const { acknowledgedFeatures } = user;
-    return _.difference(acknowledgedFeatures, activeFeatures);
+    return _.union(
+      dashboardFeatures,
+      _.difference(acknowledgedFeatures, activeFeatures)
+    );
   }
 );
 
