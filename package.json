@@ -1,5 +1,5 @@
 {
-  "name": "@interbolt/narrow-ctx",
+  "name": "@interbolt/selectable",
   "version": "0.1.0-alpha.0",
   "type": "module",
   "main": "./dist/esm/bundle.js",
@@ -10,8 +10,7 @@
     "dist"
   ],
   "scripts": {
-    "dev": "rollup -c -w --watch.onEnd=\"sh .dev.onWatchEnd.sh || true\"",
-    "ci:build": "rimraf dist && rollup -c",
+    "ci:build": "cp -r demo/src/lib/ src && rimraf dist && rollup -c",
     "ci:test": "echo \"Add a test\""
   },
   "peerDependencies": {

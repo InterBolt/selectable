@@ -1,13 +1,18 @@
-**Disclaimer: 🚧 this lib requires react/react-dom 18.3.0-canary-\* as a peer dependency**
+# ⚡ @interbolt/selectable - _(theoretically) Performant and composable hook selectors_
 
-# ⚡ Narrow Ctx - Composable context selectors
+A proof of concept API to enable (theoretically render-optimized) composable selector hooks based on Context values and hook returns.
 
-Zero-dependency drop-in replacement for React's `createContext` that exposes a composable selector-based API. See the peerDeps in this repo to grab the canary version required.
+**Disclaimer: 🚧 this lib only demonstrates the API, but requires more work from the core React team before it can deliver on any render-optimization claims.**
 
-# Must haves before I can release `>=0.1.0`:
+# Requirements to make render-optimization work
 
-- [ ] rewrite in TypeScript after React@18.3.0 is officially released
-- [ ] minimal test suite to verify render and concurrency assumptions
+- [ ] release of React version 18.3 or greater which will include the `React.use` hook
+- [ ] support for calling hooks in `React.useMemo`
+
+# TODOS required to release v0.1.0
+
+- [ ] add types
+- [ ] minimal test suite
 
 # Table of Contents
 
@@ -19,173 +24,192 @@ Zero-dependency drop-in replacement for React's `createContext` that exposes a c
 
 # Usage
 
-```tsx
-import createContext from "@interbolt/narrow-ctx";
+### Example 1) make a context "selectable".
 
-const initialCtxValue = {
-  theme: {
-    colors: {
-      dark: "rgba(50, 50, 50, .2)",
-      light: "rgba(245, 245, 245, .2)",
+```tsx
+import { createContext } from "react";
+
+const useApp = () => {
+  const timeInSeconds = useTimeInSeconds();
+  const isDarkOutside = useIsDarkOutside();
+
+  return {
+    theme: {
+      colors: {
+        dark: "black",
+        light: "white",
+      },
+      mode: isDarkOutside ? "dark" : "light",
     },
-  },
+    timeInSeconds,
+  };
 };
 
-const Context = createContext(initialCtxValue);
-const useThemeSelector = Context.narrow((ctx) => ctx.theme);
-// 🎉 Composable because the author of `useColors` does not need to know
-// the entire ctx structure to select a subset of the theme.
-const useColorsSelector = useThemeSelector.narrow((theme) => theme.colors);
+const Context = createContext(null);
 
-// The `narrow` method is attached to *any* hook that `narrow` itself returns
-const useLightColorSelector = useThemeSelector.narrow((colors) => colors.light);
+// This can be called within a render function likeso:
+// `const mode = useAppSelector(theme => theme.mode)`
+// or further narrowed, as seen in the code below.
+const useAppSelector = selectable(Context);
 
+// Narrow the portion of the context we want to select from.
+const useThemeSelector = useAppSelector.narrow((ctx) => ctx.theme);
+
+// 🎉 Composable! author of `useDarkModeColorSelector` doesn't need to know the
+// structure of the entire `ctx` value.
+const useDarkModeColorSelector = useThemeSelector.narrow(
+  (theme) => theme.colors.dark
+);
+
+// NOTE: once React adds the useMemo hook/context optimizations,
+// none of the hooks calls below should trigger rerenders when
+// `ctx.timeInSeconds` changes.
 const DisplayColorOptions = () => {
-  // 💡 Any hook created via `narrow` takes a selector as its first argument.
-  // Beware, until React Forget is released, its important to memoize selectors
-  // passed in within a render function.
-  const selectDarkColor = useCallback((colors) => colors.dark);
-  const darkModeColor = useColorsSelector(selectDarkColor);
+  const selectLightColor = useCallback((colors) => colors.dark);
 
-  // The same way of doing the above but the selector was defined outside of
-  // the render.
-  const lightModeColor = useLightColorSelector();
+  const darkModeColor = useDarkModeColorSelector();
+  const lightModeColor = useColorsSelector(selectLightColor);
 
   return (
     <div>
-      <p>Dark mode color: {lightModeColor}</p>
-      <p>Light mode color: {darkModeColor}</p>
+      <p>Light mode color: {lightModeColor}</p>
+      <p>Dark mode color: {darkModeColor}</p>
     </div>
   );
 };
 
-const App = () => {
+const AppProvider = () => {
+  const app = useApp();
+
   return (
-    <Context.Provider>
+    <Context.Provider value={app}>
       <DisplayColorOptions />
     </Context.Provider>
   );
 };
 ```
 
-# API
-
-The default export of `@interbolt/narrow-ctx` is a drop-in replacement for `React.createContext` that allows contexts to be created in two different ways:
-
-### `createContext(useHook)`
-
-Behind the scenes, this will inject the return value of `useHook()` into React's `Context.Provider` so that this:
+### Example 2) make a hook "selectable".
 
 ```tsx
 import { createContext } from "react";
 
-const initialCtxValue = {
-  theme: {
-    // ...
-  },
-};
+// This can be called within a render function likeso:
+// `const mode = useAppSelector(theme => theme.mode)`
+// or further narrowed, as seen in the code below.
+const useAppSelector = selectable(useApp);
 
-const useHook = () => {
-  const [state, setState] = useState(initialCtxValue);
-  // ...
-};
+// Narrow the portion of the `useApp` return value we want to select from.
+const useThemeSelector = useAppSelector.narrow((ctx) => ctx.theme);
 
-const Context = createContext(initialCtxValue);
-
-const CustomProvider = ({ children }) => {
-  const value = useHook();
-  // commonly implemented to prevent unnecessary rerenders in components that
-  // don't call `useContext` anywhere.
-  const memoizedChildren = useMemo(() => children, []);
-  return <Context.Provider value={value}>{memoizedChildren}</Context.Provider>;
-};
-```
-
-becomes:
-
-```tsx
-import createContext from "@interbolt/narrow-ctx";
-
-const Context = createContext(() => {
-  const [state, setState] = useState({
-    theme: {
-      // ...
-    },
-  });
-  // ...
-});
-
-const App = ({ children }) => {
-  // ✅ nice, the hook return value is injected into the Provider behind the
-  // scenes, and the `children` prop does not need memoizing.
-  return <Context.Provider>{children}</Context.Provider>;
-};
-```
-
-### or `createContext(externalState)`
-
-Useful when you want more fine grained, manual control over when changes to a context value should update the UI. Behind the scenes, `createContext` will attach a method to `externalState` called `.syncState`, which can be used likeso:
-
-```tsx
-import createContext from "@interbolt/narrow-ctx";
-
-const externalState = {
-  change: function () {
-    this.newProp = "adding new prop";
-    // Calling `syncState` makes changes to `externalState` accessible in the
-    // render tree.
-    this.syncState();
-  },
-  // ...
-};
-
-const context = createContext(externalState);
-```
-
-### The `narrow` API
-
-Behind the scenes, `@interbolt/narrow-ctx` attaches a method named `narrow` to any context it creates _and_ to any hook created as a result of a previously calling `.narrow`. This might seem strange but remember that hooks are just JavaScript functions, and JavaScript functions are just objects, and objects can be extended with new properties.
-
-Here's a look at the different ways `narrow` can be used:
-
-```tsx
-import createContext from "@interbolt/narrow-ctx";
-
-const context = createContext({
-  theme: {
-    colors: {
-      dark: "black",
-      light: "white",
-    },
-  },
-  mode: "dark",
-});
-
-// 1️⃣ When no selector function is provided as the first param to `narrow`
-// it fallsback to `selector = a => a`. And since hooks created via `narrow`
-// can take a selector as an argument as well, we've inadvertently created
-// the `useContextSelector` api proposed here https://github.com/reactjs/rfcs/pull/119
-const useContextSelector = context.narrow();
-
-// 2️⃣ Since `useContextSelector` was created via `narrow`, it will have its own
-// narrow function which we can use to further "narrow" the portion of the
-// `ctx` that a consumer of `ctx.theme` would need to know.
-const useThemeSelector = useContextSelector.narrow((ctx) => ctx.theme);
-
-// 3️⃣ The author of `useColorsSelector` below does not need to know about the
-// entire ctx structure.
-const useColorsSelector = useThemeSelector.narrow((theme) => theme.colors);
-
-// 4️⃣ I'm not sure if this is ever a great strategy 🤷🏼‍♂️, but the entire `ctx`
-// value is always accessible, no matter how "narrowed" your selector becomes.
-const useModeColorSelector = useColorsSelector(
-  (colors, ctx) => colors[ctx.mode]
+// 🎉 Composable! author of `useDarkModeColorSelector` doesn't need to know the
+// structure of the entire `ctx` value.
+const useDarkModeColorSelector = useThemeSelector.narrow(
+  (theme) => theme.colors.dark
 );
+
+// NOTE: once React adds the useMemo hook/context optimizations,
+// none of the hooks calls below should trigger rerenders when
+// `ctx.timeInSeconds` changes.
+const DisplayColorOptions = () => {
+  const selectLightColor = useCallback((colors) => colors.dark);
+
+  const darkModeColor = useDarkModeColorSelector();
+  const lightModeColor = useColorsSelector(selectLightColor);
+
+  return (
+    <div>
+      <p>Light mode color: {lightModeColor}</p>
+      <p>Dark mode color: {darkModeColor}</p>
+    </div>
+  );
+};
+```
+
+# API
+
+`@interbolt/selectable`'s default export is a function called `selectable`.
+
+Any hook produced by calling `selectable` will have a `.narrow` method attached to it (_remember, fns are just objs_).
+
+The `narrow` method will return a _useSelector(selector)_-style hook based on the selector function provided to `narrow`. Compositions of new "narrowed" selector hooks are not constrained to using only the original hook or context provided to `selectable`. The `narrow` method can take any number of other context or hooks as params and pass their values to the "narrowing" selector.
+
+That's all a little confusing so let's look at the ways we can use `selectable` and `.narrow`:
+
+```tsx
+import { UserContext, ThemeContext } from "./myAppsContexts";
+import {
+  useDashboardFeatures,
+  useFeatureFlags,
+  useAnalytics,
+} from "./myAppsHooks";
+
+// EX: 1️⃣ - create a selectable user context and then
+// use the `narrow` method to get their preferred colors by
+// by composing `useUserSelector` with `ThemeContext`.
+
+// Step 1 - create the selector hook from the `UserContext`
+const useUserSelector = selectable(UserContext);
+
+// Step 2 - create a hook that we can use to select from
+// the user's preferred colors. See how we were able to
+// use the `ThemeContext` by passing it in as the first param
+// to `.narrow`.
+const usePreferredColorsSelector = useUserSelector.narrow(
+  ThemeContext,
+  (theme, user) => theme.colors[user.colorPreference]
+);
+
+// EX: 2️⃣ - create a selectable user context and then
+// use the `useFeatureFlags` and `useDashboardFeatures` hooks
+// to create a hook that will tell us which features our UI should
+// suggest the user try on their dashboard page.
+
+// Step 1 - create the selector hook from the `UserContext`
+const useUserSelector = selectable(UserContext);
+
+// Step 2 - include the return values of `useFeatureFlags` and
+// `useDashboardFeatures` in the selector param so that we can
+// determine which active dashboard features we should suggest
+// the user try.
+const useDashboardFeaturesToSuggest = useUserSelector.narrow(
+  useFeatureFlags,
+  useDashboardFeatures,
+  (featureFlags, dashboardFeatures, user) => {
+    const { activeFeatures } = featureFlags;
+    const { acknowledgedFeatures } = user;
+    return _.difference(acknowledgedFeatures, activeFeatures);
+  }
+);
+
+// Now go crazy - what if we want to change the color of something
+// in our UI based on how many pending suggestions a user has
+// on the dashboard page.
+const useFeatureSuggestionsColor = useDashboardFeaturesToSuggest.narrow(
+  ThemeContext,
+  (theme, suggestions) => {
+    if (suggestions.length === 0) {
+      return theme.colors.pendingSuggestions.none;
+    }
+
+    // maybe a warning orange?
+    if (suggestions.length > 0 && suggestions.length < 3) {
+      return theme.colors.pendingSuggestions.some;
+    }
+
+    // maybe show a danger red?
+    return theme.colors.pendingSuggestions.lots;
+  }
+);
+
+// The author of `useFeatureSuggestionsColor` doesn't need to care
+// at all about how `useDashboardFeaturesToSuggest`
+// was implemented. Composability!!! 🎉🎉🎉
 ```
 
 # Demo
 
-Since its a bit tricky to get working until React 18.3.0 comes out, I included a demo in the `demo/` folder. To get it running do:
+I included a demo in the `demo/` folder. To get it running do:
 
 ```shell
 cd demo
@@ -193,7 +217,7 @@ npm ci
 npm run start
 ```
 
-Then navigate to `http://localhost:8080/` to see it in action. I suggest using the demo as a playground to familiarize yourself with the API.
+Then navigate to `http://localhost:8080/` to see it in action. I suggest using the demo as a playground to familiarize yourself with the API. The code inside of `demo/src/lib` is the exact code that lives in `src` so feel free to play around with the source code.
 
 # Motivation
 
@@ -244,9 +268,7 @@ useColor() {
 
 along with the following quote, _"if this was done with context selectors then you have to know precisely what you’re selecting in advance. the author of useColor can’t “narrow down” the scope to just the color changes"_
 
-But something still didn't feel quite right about doing away with the `useSelector` pattern altogether. So over the next couple of days I designed `@interbolt/narrow-ctx` to experiment with a way to somewhat "fix" `useContextSelector`'s composability problem.
-
-See the usage section to see how I implement `useTheme` and `useColor` while retaining the selector pattern API from my suggested `useContextSelector`
+But something still didn't feel quite right about doing away with the `useSelector` pattern altogether. So over the next couple of days I designed `@interbolt/selectable` to experiment with a way to somewhat "fix" `useContextSelector`'s composability problem.
 
 # Blog
 

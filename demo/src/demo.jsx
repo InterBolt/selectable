@@ -1,33 +1,38 @@
-import React, { useCallback } from "react";
+import React, { createContext, useCallback } from "react";
 import { createRoot } from "react-dom/client";
-import createContext from "./dist";
+import selectable from "./lib/index.jsx";
 
 const initialContextValue = {
   theme: {
     colors: {
-      dark: "rgba(50, 50, 50, .2)",
+      dark: "rgba(50, 50, 50, .8)",
       light: "rgba(245, 245, 245, .2)",
     },
   },
   mode: "dark",
-  change: function () {
-    this.newProp = "ok";
-    this.syncState();
-  },
-  // ...
 };
 
-const Context = createContext(initialContextValue);
+const initialSecondContextValue = {
+  theme: {
+    colors: {
+      dark: "white",
+      light: "black",
+    },
+  },
+  mode: "light",
+};
 
-// Will mimic the original proposed `useContextSelector` API
-// minus the rerender optimization.
-const useContextSelector = Context.narrow((ctx) => ctx);
+const SecondContext = createContext(initialSecondContextValue);
+const useContextSelector = selectable(() => initialContextValue);
 
 // Hooks are just functions, functions are just objects,
 // and useful methods can be attached to objects.
 // note: any hook resulting from a previous `narrow` invocation can
 // be further narrowed down by calling `narrow` on it.
-const useTheme = useContextSelector.narrow((ctx) => ctx.theme);
+const useTheme = useContextSelector.narrow(
+  SecondContext,
+  (secondCtx) => secondCtx.theme
+);
 
 // This is now composable because the author of `useColor`
 // doesn't need to know the entire context data structure
@@ -36,14 +41,16 @@ const useColors = useTheme.narrow((theme) => theme.colors);
 
 // Accessing entire context value in a narrowed down hook
 // is still possible.
-const useModeColor = useTheme.narrow((theme, ctx) => theme.colors[ctx.mode]);
+const useModeColor = useTheme.narrow((theme, root) => theme.colors[root.mode]);
 
-const useNewProp = Context.narrow((ctx) => ctx.newProp);
+const useNewProp = useContextSelector.narrow((root) => root.newProp);
 
 const App = () => {
   const newProp = useNewProp();
   // and the classic `useContextSelector` as originally proposed
-  const mode = useContextSelector((ctx) => ctx.mode);
+  const mode = useContextSelector((root) => root.mode);
+
+  console.log(mode);
 
   // Must be memoized until react forget exists.
   const selectColor = useCallback((colors) => colors[mode], [mode]);
@@ -57,8 +64,10 @@ const App = () => {
   // demonstrates another way to get the colors
   const colorsFromUseTheme = useTheme((theme) => theme.colors);
 
+  console.log(colorsFromUseTheme);
+
   // `useModeColor` computed the color based on the
-  // narrowed down ctx and full ctx.
+  // narrowed down root and full root.
   const currentColorFromNarrow = useModeColor();
 
   return (
@@ -86,9 +95,9 @@ const App = () => {
 
 const Demo = () => {
   return (
-    <Context.Provider>
+    <SecondContext.Provider value={initialSecondContextValue}>
       <App />
-    </Context.Provider>
+    </SecondContext.Provider>
   );
 };
 
