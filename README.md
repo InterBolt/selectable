@@ -109,7 +109,7 @@ const useApp = () => {
 };
 
 // This can be called within a render function likeso:
-// `const mode = useAppSelector(theme => theme.mode)`
+// `const mode = useAppSelector(ctx => ctx.theme.mode)`
 // or further narrowed, as seen in the code below.
 const useAppSelector = selectable(useApp);
 
