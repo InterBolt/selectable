@@ -92,7 +92,21 @@ const AppProvider = () => {
 ### Example 2) make a hook "selectable".
 
 ```tsx
-import { createContext } from "react";
+const useApp = () => {
+  const timeInSeconds = useTimeInSeconds();
+  const isDarkOutside = useIsDarkOutside();
+
+  return {
+    theme: {
+      colors: {
+        dark: "black",
+        light: "white",
+      },
+      mode: isDarkOutside ? "dark" : "light",
+    },
+    timeInSeconds,
+  };
+};
 
 // This can be called within a render function likeso:
 // `const mode = useAppSelector(theme => theme.mode)`
